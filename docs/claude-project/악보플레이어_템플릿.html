@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>악보 플레이어</title>
+<!--
+  ★ Claude 사용법 (이 주석은 그대로 둬도 됨)
+  1) 아래 <script type="text/xml" class="version" data-name="..."> 블록 안에 MusicXML 전체를 넣는다.
+     버전이 여러 개면 블록을 여러 개 둔다 (data-name 에 "A · 왼손 근음만" 처럼 차이를 적는다).
+  2) <h1 id="title"> 와 <ul id="changes"> 를 채운다 (바꾼 점 / 확인이 필요한 마디).
+  3) 그 외 코드는 수정하지 않는다.
+-->
+<style>
+  :root { --bg:#1b1f3b; --card:#262b52; --ink:#f4f5ff; --mute:#a9addb; --rh:#4d8dff; --lh:#3ddc97; --hl:#ff7ac6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif; }
+  header { padding:16px 20px 8px; }
+  h1 { margin:0; font-size:22px; }
+  .meta { color:var(--mute); font-size:14px; margin-top:4px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:8px 20px; }
+  button, select, input[type=number] { font:inherit; color:var(--ink); background:var(--card); border:1px solid rgba(255,255,255,.15);
+    border-radius:10px; padding:8px 14px; }
+  button { cursor:pointer; font-weight:700; }
+  button.play { background:linear-gradient(135deg,#ff7ac6,#8b6bff); border:0; min-width:110px; }
+  input[type=number] { width:64px; padding:8px; }
+  .grp { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--mute); }
+  .seg { display:flex; background:var(--card); border-radius:10px; padding:2px; }
+  .seg button { border:0; background:none; padding:6px 10px; color:var(--mute); }
+  .seg button.on { background:#3b4280; color:var(--ink); }
+  #roll { display:block; width:100%; height:340px; background:#11142a; cursor:pointer; }
+  .wrap { margin:6px 20px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.1); }
+  #kb { display:block; width:100%; height:70px; background:#11142a; }
+  .changes { margin:10px 20px 20px; background:var(--card); border-radius:14px; padding:12px 16px; font-size:14px; }
+  .changes h3 { margin:0 0 6px; font-size:15px; }
+  .changes ul { margin:0; padding-left:18px; } .changes li { margin:3px 0; }
+  .legend { font-size:13px; color:var(--mute); padding:0 20px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin:0 4px 0 10px; }
+  .err { color:#ff8a95; padding:20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">곡 제목 (쉬움)</h1>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div class="bar">
+  <button class="play" id="play">▶ 재생</button>
+  <select id="version" title="버전"></select>
+  <div class="seg" id="hands">
+    <button data-h="both" class="on">양손</button><button data-h="rh">오른손</button><button data-h="lh">왼손</button>
+  </div>
+  <div class="grp">속도 <input type="range" id="speed" min="40" max="150" step="5" value="100" /> <b id="speedTxt">100%</b></div>
+  <div class="grp">마디 <input type="number" id="from" min="1" value="1" /> ~ <input type="number" id="to" min="1" value="1" />
+    <label><input type="checkbox" id="loop" /> 반복</label></div>
+  <label class="grp"><input type="checkbox" id="metro" /> 🥁 메트로놈</label>
+</div>
+<div class="legend"><i style="background:var(--rh)"></i>오른손 <i style="background:var(--lh)"></i>왼손 · 그림을 누르면 그 마디부터 재생</div>
+<div class="wrap"><canvas id="roll"></canvas><canvas id="kb"></canvas></div>
+<div class="bar">
+  <button id="dlXml">⬇ MusicXML 받기 (피아노 스타 앱용)</button>
+  <button id="dlMid">⬇ MIDI 받기</button>
+  <button id="copyXml">📋 MusicXML 복사</button>
+  <span id="msg" class="grp"></span>
+</div>
+<div class="changes">
+  <h3>바뀐 점 / 확인할 곳</h3>
+  <ul id="changes">
+    <li>(Claude 가 채움)</li>
+  </ul>
+</div>
+
+<!-- ===== 악보 데이터 (Claude 가 채움) ===== -->
+<script type="text/xml" class="version" data-name="기본">
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1"><work><work-title>곡 제목 (쉬움)</work-title></work><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes><direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>90</per-minute></metronome></direction-type><sound tempo="90"/></direction><note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><staff>1</staff></note><note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><staff>1</staff></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><type>half</type><staff>1</staff></note><backup><duration>4</duration></backup><note><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><voice>5</voice><type>whole</type><staff>2</staff></note></measure></part></score-partwise>
+</script>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const STEP = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  const KEYS = { '-7':'C♭', '-6':'G♭', '-5':'D♭', '-4':'A♭', '-3':'E♭', '-2':'B♭', '-1':'F', '0':'C', '1':'G', '2':'D', '3':'A', '4':'E', '5':'B', '6':'F♯', '7':'C♯' };
+  const NAMES = ['도','도#','레','미b','미','파','파#','솔','솔#','라','시b','시'];
+
+  // ---------- MusicXML → 음표 목록 (시간 단위: 4분음표) ----------
+  function parse(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText.trim(), 'application/xml');
+    if (doc.querySelector('parsererror')) throw new Error('MusicXML 형식 오류: ' + doc.querySelector('parsererror').textContent.slice(0, 200));
+    const kid = (el, n) => [...el.children].find((c) => c.tagName === n);
+    const txt = (el, n) => { const k = kid(el, n); return k ? k.textContent.trim() : null; };
+    const notes = [], measures = [];
+    let tempo = null, fifths = 0, timeSig = '4/4', title = '';
+    title = doc.querySelector('work-title')?.textContent || doc.querySelector('movement-title')?.textContent || '';
+    doc.querySelectorAll('part').forEach((part, pi) => {
+      let div = 1, start = 0, beats = 4, beatType = 4;
+      const open = new Map();
+      [...part.children].filter((m) => m.tagName === 'measure').forEach((m, mi) => {
+        const at = kid(m, 'attributes');
+        if (at) {
+          if (txt(at, 'divisions')) div = +txt(at, 'divisions');
+          const k = kid(at, 'key'); if (k && mi === 0 && pi === 0) fifths = +txt(k, 'fifths');
+          const t = kid(at, 'time'); if (t) { beats = +txt(t, 'beats'); beatType = +txt(t, 'beat-type'); if (mi === 0) timeSig = beats + '/' + beatType; }
+        }
+        let pos = 0, last = 0, max = 0;
+        for (const el of m.children) {
+          if (el.tagName === 'direction' || el.tagName === 'sound') {
+            const s = el.tagName === 'sound' ? el : el.querySelector('sound');
+            if (s && s.getAttribute('tempo') && tempo == null) tempo = +s.getAttribute('tempo');
+          } else if (el.tagName === 'backup') pos -= +txt(el, 'duration');
+          else if (el.tagName === 'forward') { pos += +txt(el, 'duration'); max = Math.max(max, pos); }
+          else if (el.tagName === 'note') {
+            if (kid(el, 'grace')) continue;
+            const d = +txt(el, 'duration');
+            const isChord = !!kid(el, 'chord');
+            const st = isChord ? last : pos;
+            if (!isChord) { last = pos; pos += d; }
+            max = Math.max(max, pos);
+            const p = kid(el, 'pitch');
+            if (!p) continue;
+            const midi = 12 * (+txt(p, 'octave') + 1) + STEP[txt(p, 'step')] + (+txt(p, 'alter') || 0);
+            const staff = +(txt(el, 'staff') || (pi === 0 ? 1 : 2));
+            const t0 = start + st / div, t1 = start + (st + d) / div;
+            const ties = [...el.children].filter((c) => c.tagName === 'tie').map((c) => c.getAttribute('type'));
+            const key = midi + '/' + staff;
+            if (ties.includes('stop') && open.has(key)) open.get(key).end = t1;
+            else { const n = { midi, start: t0, end: t1, staff, measure: mi }; notes.push(n); open.set(key, n); }
+            if (!ties.includes('start')) open.delete(key);
+          }
+        }
+        const len = Math.max(max / div, (m.getAttribute('implicit') === 'yes' || mi === 0) ? max / div : beats * 4 / beatType);
+        if (pi === 0) measures.push({ start, len, beats: beats * 4 / beatType, beatLen: 4 / beatType });
+        start += len;
+      });
+    });
+    return { notes, measures, tempo: tempo || 100, key: KEYS[fifths] || 'C', timeSig, title };
+  }
+
+  // ---------- 소리 ----------
+  let ctx = null;
+  const getCtx = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx; };
+  function tone(midi, when, dur, out, vel = 0.22) {
+    const f = 440 * Math.pow(2, (midi - 69) / 12);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(vel, when + 0.008);
+    g.gain.exponentialRampToValueAtTime(vel * 0.35, when + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0008, when + Math.max(0.3, dur) + 0.25);
+    g.connect(out);
+    for (const [mul, type, amp] of [[1, 'triangle', 1], [2, 'sine', 0.35], [3, 'sine', 0.12]]) {
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.type = type; o.frequency.value = f * mul; og.gain.value = amp;
+      o.connect(og); og.connect(g); o.start(when); o.stop(when + Math.max(0.3, dur) + 0.3);
+    }
+  }
+  function tick(when, accent, out) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = accent ? 1600 : 1100;
+    g.gain.setValueAtTime(accent ? 0.25 : 0.15, when); g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
+    o.connect(g); g.connect(out); o.start(when); o.stop(when + 0.06);
+  }
+
+  // ---------- 상태 ----------
+  const versions = [...document.querySelectorAll('script.version')].map((s, i) => ({ name: s.dataset.name || `버전 ${i + 1}`, xml: s.textContent.trim() }));
+  let data, vIdx = 0, hands = 'both', play = null, lo = 48, hi = 84, viewStart = 0;
+
+  versions.forEach((v, i) => { const o = document.createElement('option'); o.value = i; o.textContent = v.name; $('version').appendChild(o); });
+  $('version').style.display = versions.length > 1 ? '' : 'none';
+
+  function load(i) {
+    stop();
+    vIdx = i;
+    try { data = parse(versions[i].xml); } catch (e) { document.body.insertAdjacentHTML('afterbegin', `<div class="err">${e.message}</div>`); return; }
+    const ms = data.notes.map((n) => n.midi);
+    lo = Math.min(...ms) - 2; hi = Math.max(...ms) + 2;
+    $('meta').textContent = `${data.key}장조(조표 기준) · ${data.timeSig}박자 · ♩=${data.tempo} · ${data.measures.length}마디 · 음표 ${data.notes.length}개`;
+    $('to').max = $('from').max = data.measures.length;
+    $('to').value = data.measures.length; $('from').value = 1;
+    viewStart = 0;
+    draw(-1);
+  }
+
+  const visible = (n) => hands === 'both' || (hands === 'rh' ? n.staff === 1 : n.staff !== 1);
+
+  function start(fromM) {
+    stop();
+    const c = getCtx();
+    const out = c.createGain(); out.connect(c.destination);
+    const bpm = data.tempo * (+$('speed').value) / 100;
+    const spq = 60 / bpm;
+    const a = Math.max(1, Math.min(+$('from').value, data.measures.length)) - 1;
+    const b = Math.max(a, Math.min(+$('to').value, data.measures.length) - 1);
+    const m0 = fromM != null ? fromM : a;
+    const tA = data.measures[m0].start, tB = data.measures[b].start + data.measures[b].len;
+    const t0 = c.currentTime + 0.25;
+    for (const n of data.notes) {
+      if (!visible(n) || n.start < tA - 1e-6 || n.start >= tB - 1e-6) continue;
+      tone(n.midi, t0 + (n.start - tA) * spq, (Math.min(n.end, tB) - n.start) * spq * 0.95, out);
+    }
+    if ($('metro').checked) {
+      for (let m = m0; m <= b; m++) {
+        const ms = data.measures[m];
+        for (let k = 0; k * ms.beatLen < ms.len - 1e-6; k++) tick(t0 + (ms.start + k * ms.beatLen - tA) * spq, k === 0, out);
+      }
+    }
+    play = { out, t0, tA, tB, spq, a, raf: 0 };
+    $('play').textContent = '■ 정지';
+    const loop = () => {
+      if (!play) return;
+      const q = play.tA + (c.currentTime - play.t0) / play.spq;
+      if (q >= play.tB) { const again = $('loop').checked; stop(); if (again) start(a); return; }
+      draw(q);
+      play.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+  function stop() {
+    if (!play) return;
+    cancelAnimationFrame(play.raf);
+    play.out.disconnect();
+    play = null;
+    $('play').textContent = '▶ 재생';
+    draw(-1);
+  }
+
+  // ---------- 그리기 ----------
+  const roll = $('roll'), kb = $('kb');
+  const PX_Q = 70; // 4분음표 하나의 가로 폭
+  function fit(cv) { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = r.width * d; cv.height = r.height * d; const g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); return [g, r.width, r.height]; }
+  function draw(q) {
+    if (!data) return;
+    const [g, W, H] = fit(roll);
+    const rows = hi - lo + 1, rh = H / rows;
+    if (q >= 0) { const x = (q - viewStart) * PX_Q; if (x > W * 0.7 || x < 0) viewStart = Math.max(0, q - (W * 0.2) / PX_Q); }
+    const X = (t) => (t - viewStart) * PX_Q;
+    g.fillStyle = '#11142a'; g.fillRect(0, 0, W, H);
+    for (let m = lo; m <= hi; m++) if ([1, 3, 6, 8, 10].includes(m % 12)) { g.fillStyle = '#161a36'; g.fillRect(0, H - (m - lo + 1) * rh, W, rh); }
+    g.font = '11px sans-serif';
+    data.measures.forEach((ms, i) => {
+      const x = X(ms.start);
+      if (x < -200 || x > W + 10) return;
+      g.fillStyle = '#2b3160'; g.fillRect(x, 0, 1, H);
+      g.fillStyle = '#7d82b8'; g.fillText(String(i + 1), x + 3, 12);
+    });
+    for (const n of data.notes) {
+      const x = X(n.start), w = Math.max(3, (n.end - n.start) * PX_Q - 2);
+      if (x > W || x + w < 0) continue;
+      const on = q >= n.start && q < n.end;
+      g.globalAlpha = visible(n) ? 1 : 0.18;
+      g.fillStyle = on ? '#ff7ac6' : n.staff === 1 ? '#4d8dff' : '#3ddc97';
+      g.fillRect(x, H - (n.midi - lo + 1) * rh + 1, w, Math.max(2, rh - 2));
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = '#ffffff55';
+    for (let m = lo; m <= hi; m++) if (m % 12 === 0) g.fillText(NAMES[0] + (m / 12 - 1), 2, H - (m - lo) * rh - 2);
+    if (q >= 0) { g.fillStyle = '#ff7ac6'; g.fillRect(X(q), 0, 2, H); }
+    drawKb(q);
+  }
+  function drawKb(q) {
+    const [g, W, H] = fit(kb);
+    const lowC = 36, highC = 96, whites = [];
+    for (let m = lowC; m <= highC; m++) if (![1, 3, 6, 8, 10].includes(m % 12)) whites.push(m);
+    const ww = W / whites.length;
+    const active = new Map();
+    if (q >= 0) for (const n of data.notes) if (visible(n) && q >= n.start && q < n.end) active.set(n.midi, n.staff === 1 ? '#4d8dff' : '#3ddc97');
+    whites.forEach((m, i) => { g.fillStyle = active.get(m) || '#f4f5ff'; g.fillRect(i * ww + 1, 0, ww - 2, H); if (m % 12 === 0) { g.fillStyle = '#555'; g.font = '10px sans-serif'; g.fillText('C' + (m / 12 - 1), i * ww + 3, H - 4); } });
+    for (let m = lowC; m <= highC; m++) if ([1, 3, 6, 8, 10].includes(m % 12)) {
+      const i = whites.indexOf(m - 1);
+      g.fillStyle = active.get(m) || '#1b1f3b'; g.fillRect((i + 1) * ww - ww * 0.3, 0, ww * 0.6, H * 0.6);
+    }
+  }
+
+  // ---------- 내보내기 ----------
+  function save(blob, name) {
+    try {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      $('msg').textContent = '다운로드를 시작했어요. 안 되면 "MusicXML 복사"를 쓰세요.';
+    } catch { $('msg').textContent = '이 화면에서는 다운로드가 막혀 있어요. "MusicXML 복사"를 쓰세요.'; }
+  }
+  const fileBase = () => (data.title || 'score').replace(/[\\/:*?"<>|]/g, '').trim() + (versions.length > 1 ? ' ' + versions[vIdx].name.split('·')[0].trim() : '');
+  function toMidi() {
+    const TPQ = 480, ev = [];
+    for (const n of data.notes) { ev.push([Math.round(n.start * TPQ), 1, n.midi]); ev.push([Math.round(n.end * TPQ) - 10, 0, n.midi]); }
+    ev.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const by = [], vlq = (v) => { const o = [v & 0x7f]; while ((v >>= 7)) o.unshift((v & 0x7f) | 0x80); by.push(...o); };
+    const us = Math.round(60000000 / data.tempo);
+    vlq(0); by.push(0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255); vlq(0); by.push(0xc0, 0);
+    let t = 0; for (const [tk, on, m] of ev) { vlq(Math.max(0, tk - t)); t = Math.max(t, tk); by.push(on ? 0x90 : 0x80, m, on ? 80 : 0); }
+    vlq(0); by.push(0xff, 0x2f, 0);
+    const L = by.length;
+    return new Uint8Array([0x4d,0x54,0x68,0x64,0,0,0,6,0,0,0,1,TPQ >> 8,TPQ & 255,0x4d,0x54,0x72,0x6b,(L >>> 24) & 255,(L >> 16) & 255,(L >> 8) & 255,L & 255,...by]);
+  }
+  $('dlXml').onclick = () => save(new Blob([versions[vIdx].xml], { type: 'application/vnd.recordare.musicxml+xml' }), fileBase() + '.musicxml');
+  $('dlMid').onclick = () => save(new Blob([toMidi()], { type: 'audio/midi' }), fileBase() + '.mid');
+  $('copyXml').onclick = async () => {
+    try { await navigator.clipboard.writeText(versions[vIdx].xml); $('msg').textContent = '복사했어요! 피아노 스타 앱 → 📋 붙여넣기'; }
+    catch { const ta = document.createElement('textarea'); ta.value = versions[vIdx].xml; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); $('msg').textContent = '복사했어요! 피아노 스타 앱 → 📋 붙여넣기'; }
+  };
+
+  // ---------- 이벤트 ----------
+  $('play').onclick = () => (play ? stop() : start());
+  $('version').onchange = (e) => load(+e.target.value);
+  $('hands').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; hands = b.dataset.h; [...$('hands').children].forEach((x) => x.classList.toggle('on', x === b)); if (play) start(); else draw(-1); };
+  $('speed').oninput = () => { $('speedTxt').textContent = $('speed').value + '%'; };
+  roll.onclick = (e) => {
+    const r = roll.getBoundingClientRect();
+    const q = viewStart + (e.clientX - r.left) / PX_Q;
+    let m = data.measures.findIndex((ms) => q >= ms.start && q < ms.start + ms.len);
+    if (m < 0) m = 0;
+    if (m + 1 > +$('to').value) $('to').value = data.measures.length;
+    start(m);
+  };
+  roll.addEventListener('wheel', (e) => { if (play) return; e.preventDefault(); viewStart = Math.max(0, viewStart + (e.deltaY + e.deltaX) / PX_Q); draw(-1); }, { passive: false });
+  let touchX = null;
+  roll.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  roll.addEventListener('touchmove', (e) => { if (play || touchX == null) return; const x = e.touches[0].clientX; viewStart = Math.max(0, viewStart - (x - touchX) / PX_Q); touchX = x; draw(-1); }, { passive: true });
+  addEventListener('resize', () => draw(-1));
+  load(0);
+})();
+</script>
+</body>
+</html>

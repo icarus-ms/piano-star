@@ -1,0 +1,5 @@
+node_modules/
+scores/inbox/*
+!scores/inbox/.gitkeep
+scores/drafts/
+.claude/settings.local.json

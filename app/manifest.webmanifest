@@ -1,0 +1,12 @@
+{
+  "name": "피아노 스타",
+  "short_name": "피아노 스타",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1b1f3b",
+  "theme_color": "#1b1f3b",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
