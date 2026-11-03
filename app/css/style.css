@@ -69,13 +69,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .score-wrap { flex: 1; overflow: auto; background: #fffdf7; position: relative; margin: 0 12px 12px; border-radius: var(--radius); }
 #osmd { padding: 8px 4px; }
-.judge-pop { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 64px; font-weight: 900;
-  pointer-events: none; opacity: 0; text-shadow: 0 4px 16px rgba(0,0,0,.35); }
-.judge-pop.show { animation: pop .6s ease-out; }
-@keyframes pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -80%) scale(1); } }
-.countdown { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; font-size: 160px; font-weight: 900;
-  color: var(--accent); background: rgba(27,31,59,.35); pointer-events: none; }
-.countdown.show { display: flex; }
+/* 판정 표시는 악보를 가리지 않도록 위쪽 점수 줄 안에만 */
+.judge-pop { min-width: 96px; text-align: center; font-size: 22px; font-weight: 900; white-space: nowrap; opacity: 0; pointer-events: none; }
+.judge-pop.show { animation: pop .9s ease-out; }
+@keyframes pop { 0% { opacity: 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 .wait-bar { display: none; align-items: center; justify-content: center; gap: 16px; padding: 0 0 12px; color: var(--mute); }
 .wait-bar.show { display: flex; }
 .c-blue b, .c-blue { color: #7fb0ff; } .c-yellow b, .c-yellow { color: var(--yellow); } .c-red b, .c-red { color: #ff8a95; }

@@ -37,7 +37,12 @@ export class Mic {
     src.connect(this.fast); src.connect(this.slow);
     this.src = src;
     this.fastBuf = new Float32Array(this.fast.frequencyBinCount);
-    this.prevFast = new Float32Array(this.fast.frequencyBinCount);
+    // 3틱(약 24ms) 전 스펙트럼과 비교 → 같은 음 연타처럼 천천히 커지는 어택도 잡는다
+    this.prevRing = [0, 1, 2].map(() => new Float32Array(this.fast.frequencyBinCount));
+    this.ringPos = 0;
+    // 배경 소음 기준(적응형): 태블릿 마이크 입력이 작아도 같은 기준으로 감지되게 한다
+    this.noiseAmp = 1e-4;
+    this.noiseRms = 0.001;
     this.slowBuf = new Float32Array(this.slow.frequencyBinCount);
     this.timeBuf = new Float32Array(this.fast.fftSize);
     this.fluxHist = [];
@@ -69,13 +74,22 @@ export class Mic {
     this.fast.getFloatFrequencyData(this.fastBuf);
     const binHz = ctx.sampleRate / this.fast.fftSize;
     const lo = Math.max(1, Math.floor(50 / binHz)), hi = Math.min(this.fastBuf.length - 1, Math.floor(6000 / binHz));
+    // 이번 프레임의 대역 중앙 크기 → 소음 기준 추적 (내려갈 땐 바로, 올라갈 땐 천천히)
+    const amps = new Float32Array(hi - lo);
+    for (let i = lo; i < hi; i++) amps[i - lo] = Math.pow(10, this.fastBuf[i] / 20);
+    const frameMed = Float32Array.from(amps).sort()[amps.length >> 1] || 1e-7;
+    this.noiseAmp = Math.min(3e-3, Math.max(1e-6, frameMed < this.noiseAmp ? frameMed : this.noiseAmp * 1.001));
+    this.noiseRms = Math.max(1e-5, rms < this.noiseRms ? rms : this.noiseRms * 1.001);
+    const scale = 1 / (this.noiseAmp * 3); // 소음 ≈ 0.3, 소음보다 30dB 크면 ≈ 2.4
+    const prev = this.prevRing[this.ringPos];
     let flux = 0;
     for (let i = lo; i < hi; i++) {
-      const v = Math.log1p(Math.pow(10, this.fastBuf[i] / 20) * 1000);
-      const d = v - this.prevFast[i];
+      const v = Math.log1p(amps[i - lo] * scale);
+      const d = v - prev[i];
       if (d > 0) flux += d;
-      this.prevFast[i] = v;
+      prev[i] = v;
     }
+    this.ringPos = (this.ringPos + 1) % this.prevRing.length;
     const hist = this.fluxHist;
     hist.push(flux); if (hist.length > 60) hist.shift();
     const sorted = [...hist].sort((a, b) => a - b);
@@ -84,7 +98,7 @@ export class Mic {
     const k = 2.6 - this.sensitivity * 0.16;
     const floor = 9 - this.sensitivity * 0.7;
     const now = ctx.currentTime;
-    if (flux > med * k + floor && rms > 0.003 && now - this.lastOnset > 0.07) {
+    if (flux > med * k + floor && rms > Math.max(3e-4, this.noiseRms * 2) && now - this.lastOnset > 0.07) {
       this.lastOnset = now;
       const pre = this.salience();
       const t = now - (this.fast.fftSize / ctx.sampleRate) * 0.5 - this.latency;
@@ -131,14 +145,18 @@ function makeOnset(time, pre, post, sens) {
     nov[m] = d > 0 ? d : 0;
     if (nov[m] > max) max = nov[m];
   }
+  let postMax = 0;
+  for (let m = MIDI_LO; m <= MIDI_HI; m++) if (post[m] > postMax) postMax = post[m];
+  const isPeak = (a, m) => a[m] >= a[m - 1] * 0.9 && a[m] >= a[m + 1] * 0.9;
+  // 같은 음 연타: 직전 음이 아직 울려서 "새 음"으로는 작게 보이지만, 다시 쳤으니 줄지 않고 커진다
+  const restruck = (m) => post[m] >= pre[m] * 1.05 && post[m] >= postMax * 0.35 && isPeak(post, m);
   const thr = 0.42 - sens * 0.025; // 감도 높을수록 약한 음도 인정
   return {
     time, nov, max, used: new Set(),
     // m 음이 이번에 쳐졌는가 (반음 옆 음보다 강해야 함)
     has(m) {
-      if (max <= 0) return false;
-      const v = nov[m];
-      return v >= max * thr && v >= nov[m - 1] * 0.9 && v >= nov[m + 1] * 0.9;
+      if (max > 0 && nov[m] >= max * thr && isPeak(nov, m)) return true;
+      return restruck(m);
     },
     // 가장 강한 음들 (오답 표시용)
     top(k = 3) {

@@ -1,6 +1,69 @@
 {
-  "updated": "2026-11-02T06:17:24.696Z",
+  "updated": "2026-11-03T09:21:30.854Z",
   "songs": [
+    {
+      "id": "brahms_lullaby_normal",
+      "file": "brahms_lullaby_normal.musicxml",
+      "title": "브람스 자장가 (보통)",
+      "level": "보통",
+      "tempo": 84,
+      "measures": 17,
+      "notes": 128
+    },
+    {
+      "id": "canon_d_normal",
+      "file": "canon_d_normal.musicxml",
+      "title": "캐논 (보통)",
+      "level": "보통",
+      "tempo": 72,
+      "measures": 17,
+      "notes": 134
+    },
+    {
+      "id": "entertainer_hard",
+      "file": "entertainer_hard.musicxml",
+      "title": "엔터테이너 (어려움)",
+      "level": "어려움",
+      "tempo": 76,
+      "measures": 17,
+      "notes": 171
+    },
+    {
+      "id": "fur_elise_hard",
+      "file": "fur_elise_hard.musicxml",
+      "title": "엘리제를 위하여 (어려움)",
+      "level": "어려움",
+      "tempo": 66,
+      "measures": 31,
+      "notes": 193
+    },
+    {
+      "id": "greensleeves_normal",
+      "file": "greensleeves_normal.musicxml",
+      "title": "그린슬리브스 (보통)",
+      "level": "보통",
+      "tempo": 96,
+      "measures": 32,
+      "notes": 224
+    },
+    {
+      "id": "gymnopedie_normal",
+      "file": "gymnopedie_normal.musicxml",
+      "title": "짐노페디 1번 (보통)",
+      "level": "보통",
+      "tempo": 72,
+      "measures": 21,
+      "notes": 107
+    },
+    {
+      "id": "minuet_g_normal",
+      "file": "minuet_g_normal.musicxml",
+      "title": "미뉴에트 G장조 (보통)",
+      "level": "보통",
+      "tempo": 100,
+      "measures": 32,
+      "notes": 192
+    },
     {
       "id": "ode_to_joy_normal",
       "file": "ode_to_joy_normal.musicxml",
@@ -9,6 +72,33 @@
       "tempo": 100,
       "measures": 8,
       "notes": 62
+    },
+    {
+      "id": "prelude_c_hard",
+      "file": "prelude_c_hard.musicxml",
+      "title": "프렐류드 C장조 (어려움)",
+      "level": "어려움",
+      "tempo": 60,
+      "measures": 20,
+      "notes": 310
+    },
+    {
+      "id": "scarborough_fair_normal",
+      "file": "scarborough_fair_normal.musicxml",
+      "title": "스카버러 페어 (보통)",
+      "level": "보통",
+      "tempo": 100,
+      "measures": 32,
+      "notes": 194
+    },
+    {
+      "id": "swan_lake_normal",
+      "file": "swan_lake_normal.musicxml",
+      "title": "백조의 호수 (보통)",
+      "level": "보통",
+      "tempo": 76,
+      "measures": 8,
+      "notes": 92
     },
     {
       "id": "twinkle_easy",

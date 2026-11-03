@@ -203,21 +203,23 @@ async function startSession() {
   $('btnStart').textContent = '■ 정지';
 
   if (mode === 'rhythm') {
-    const bpmMeasure = score.beatsPerMeasure;
-    session.t0 = ctx.currentTime + 0.6 + bpmMeasure * spb;
-    for (let k = 0; k < bpmMeasure; k++) click(ctx, session.t0 - (bpmMeasure - k) * spb, k === 0, out);
-    if ($('metroOn').checked) {
-      const beats = Math.ceil(score.totalWhole * 4);
-      for (let k = 0; k < beats; k++) click(ctx, session.t0 + k * spb, k % bpmMeasure === 0, out);
-    }
+    // 카운트다운 없이: 첫 음을 치는 순간이 곧 시작 (그 시각에 맞춰 박자 기준 t0 를 정한다)
+    session.t0 = null;
     session.times = score.steps.map((_, i) => score.stepTime(i, bpm));
     session.end = (session.times[session.times.length - 1] || 0) + 1.2;
-    $('countdown').classList.add('show');
+    const first = judgeable[0];
+    if (first == null) { stopSession(true); return; }
+    score.moveCursorTo(first);
+    const names = score.steps[first].expect.slice().sort((a, b) => a - b).map(midiNameKo).join(' + ');
+    $('waitHint').textContent = `준비되면 첫 음 ${names} 을(를) 치세요 — 치는 순간 시작해요`;
+    $('btnSkip').style.display = 'none';
+    $('waitBar').classList.add('show');
   } else {
     session.cur = 0;
     session.acc = new Map();
     session.wrongs = 0;
     gotoWaitStep();
+    $('btnSkip').style.display = '';
     $('waitBar').classList.add('show');
   }
   loop();
@@ -230,7 +232,6 @@ function stopSession(userStopped) {
   session.wake?.release?.();
   cancelAnimationFrame(session.raf);
   mic.stop();
-  $('countdown').classList.remove('show');
   $('waitBar').classList.remove('show');
   $('btnStart').textContent = '▶ 시작';
   const s = session;
@@ -245,11 +246,8 @@ function loop() {
   if (!s) return;
   $('micLevel').style.width = `${mic.level * 100}%`;
   if (s.mode === 'rhythm') {
-    const t = s.ctx.currentTime - s.t0;
-    if (t < 0) {
-      $('countdown').textContent = Math.ceil(-t / s.spb);
-    } else {
-      $('countdown').classList.remove('show');
+    if (s.t0 != null) {
+      const t = s.ctx.currentTime - s.t0;
       let i = s.next;
       while (i + 1 < s.times.length && s.times[i + 1] <= t + 0.02) i++;
       if (i !== s.next || !s.started) { s.next = i; s.started = true; score.moveCursorTo(i); }
@@ -266,10 +264,29 @@ function onOnset(o) {
   const s = session;
   if (!s) return;
   if (s.mode === 'rhythm') {
+    if (s.t0 == null && !startOnFirstNote(o)) return;
     o.t = o.time - s.t0;
     s.onsets.push(o);
     if (s.onsets.length > 200) s.onsets.splice(0, 50);
   } else onWaitOnset(o);
+}
+
+// 리듬 모드: 첫 음이 맞게 들리면 그 시각을 기준으로 연주 시작
+function startOnFirstNote(o) {
+  const s = session, first = s.judgeable[0], st = score.steps[first];
+  const hit = st.expect.filter((m) => o.has(m)).length;
+  if (hit < needCount(st.expect.length, s.jp.ratio)) {
+    const top = o.top(1);
+    if (top.length) $('waitHint').textContent = `앗, ${midiNameKo(top[0])} 이(가) 들렸어요 → 첫 음 ${st.expect.map(midiNameKo).join(' + ')} 를 치면 시작해요`;
+    return false;
+  }
+  s.t0 = o.time - s.times[first];
+  $('waitBar').classList.remove('show');
+  if ($('metroOn').checked) {
+    const bpmMeasure = score.beatsPerMeasure, beats = Math.ceil(score.totalWhole * 4), now = s.ctx.currentTime + 0.02;
+    for (let k = 0; k < beats; k++) { const at = s.t0 + k * s.spb; if (at > now) click(s.ctx, at, k % bpmMeasure === 0, s.out); }
+  }
+  return true;
 }
 
 // ---------- 리듬 모드 판정 ----------
