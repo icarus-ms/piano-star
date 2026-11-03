@@ -29,8 +29,11 @@
     <div class="song-toolbar">
       <h2>곡 목록</h2>
       <div class="toolbar-btns">
-        <button class="btn ghost" id="btnPaste">📋 붙여넣기</button>
-        <label class="btn ghost">📂 파일 열기<input type="file" id="fileInput" hidden /></label>
+        <button class="btn ghost" id="btnRestore" hidden>↩ 기본 곡 되돌리기</button>
+        <button class="btn ghost add-btn" id="btnPaste">📋 붙여넣기</button>
+        <label class="btn ghost add-btn">📂 파일 열기<input type="file" id="fileInput" hidden /></label>
+        <button class="btn ghost" id="btnRenameMode">✏️ 이름 바꾸기</button>
+        <button class="btn ghost danger" id="btnDelMode">🗑 삭제하기</button>
       </div>
     </div>
     <div id="songList" class="song-list"></div>
@@ -149,6 +152,33 @@
       <div class="modal-actions">
         <button class="btn ghost" id="btnPasteCancel">취소</button>
         <button class="btn primary" id="btnPasteOk">곡 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 곡 삭제 확인 ===== -->
+  <div class="modal" id="delModal">
+    <div class="modal-card">
+      <h3>🗑 곡 삭제</h3>
+      <p id="delMsg"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="btnDelCancel">취소</button>
+        <button class="btn primary danger-fill" id="btnDelOk">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 곡 이름 바꾸기 ===== -->
+  <div class="modal" id="renameModal">
+    <div class="modal-card">
+      <h3>✏️ 곡 이름 바꾸기</h3>
+      <input type="text" id="renameInput" maxlength="60" />
+      <div class="modal-actions">
+        <button class="btn ghost" id="btnRenameCancel">취소</button>
+        <div class="toolbar-btns">
+          <button class="btn ghost" id="btnRenameReset" hidden>↩ 원래 이름</button>
+          <button class="btn primary" id="btnRenameOk">바꾸기</button>
+        </div>
       </div>
     </div>
   </div>

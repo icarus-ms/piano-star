@@ -4,6 +4,8 @@ import { loadProfile, saveProfile, resetProfile, levelInfo, currentStreak, recor
 
 const $ = (id) => document.getElementById(id);
 const USER_KEY = 'pianoStar.userScores.v1';
+const HIDDEN_KEY = 'pianoStar.hiddenSongs.v1';   // 삭제한 기본 곡 id (파일은 서버에 있으니 목록에서만 숨김)
+const RENAME_KEY = 'pianoStar.renamedSongs.v1';  // 기본 곡 id → 바꾼 이름
 
 const profile = loadProfile();
 const mic = new Mic();
@@ -13,6 +15,9 @@ let mode = 'rhythm';
 let session = null;   // 연주 중 상태
 let preview = null;   // 미리 듣기 상태
 let lastSongs = [];
+let listMode = '';     // '' | 'del' | 'rename'
+let delTarget = null;
+let renameTarget = null;
 
 // ================= 화면 전환 =================
 function show(id) {
@@ -43,6 +48,8 @@ function renderProfile() {
 const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 function userScores() { try { return JSON.parse(localStorage.getItem(USER_KEY)) || []; } catch { return []; } }
+function hiddenSongs() { try { return JSON.parse(localStorage.getItem(HIDDEN_KEY)) || []; } catch { return []; } }
+function renamedSongs() { try { return JSON.parse(localStorage.getItem(RENAME_KEY)) || {}; } catch { return {}; } }
 
 async function loadSongs() {
   let builtin = [];
@@ -50,6 +57,11 @@ async function loadSongs() {
     const r = await fetch('scores/index.json', { cache: 'no-cache' });
     builtin = (await r.json()).songs.map((s) => ({ ...s, src: 'builtin' }));
   } catch { toast('곡 목록을 불러오지 못했어요'); }
+  const hidden = hiddenSongs();
+  const renamed = renamedSongs();
+  builtin = builtin.filter((s) => !hidden.includes(s.id))
+    .map((s) => (renamed[s.id] ? { ...s, origTitle: s.title, title: renamed[s.id] } : s));
+  $('btnRestore').hidden = !(listMode === 'del' && hidden.length);
   const mine = userScores().map((s) => ({ id: s.id, title: s.title, level: '내 파일', src: 'user' }));
   lastSongs = [...builtin, ...mine];
   const list = $('songList');
@@ -62,20 +74,84 @@ async function loadSongs() {
       <h3>${esc(s.title)}</h3>
       <div class="song-meta">${s.level ? `<span class="lv-tag lv-${esc(s.level)}">${esc(s.level)}</span>` : ''}
         ${s.measures ? `<span>${s.measures}마디</span>` : ''}${s.tempo ? `<span>♩=${s.tempo}</span>` : ''}</div>
-      <div class="best">${b ? `<span class="g">${b.grade}</span> 최고 ${Math.round(b.score)}점 ${sparkline(b.history)}` : '<span style="color:var(--mute)">아직 기록 없음</span>'}</div>
-      ${s.src === 'user' ? '<button class="del">삭제</button>' : ''}`;
-    card.onclick = (e) => {
-      if (e.target.classList.contains('del')) {
-        e.stopPropagation();
-        localStorage.setItem(USER_KEY, JSON.stringify(userScores().filter((u) => u.id !== s.id)));
-        loadSongs();
-        return;
-      }
-      openSong(s);
-    };
+      <div class="best">${b ? `<span class="g">${b.grade}</span> 최고 ${Math.round(b.score)}점 ${sparkline(b.history)}` : '<span style="color:var(--mute)">아직 기록 없음</span>'}</div>`;
+    card.onclick = () => (listMode === 'del' ? askDelete(s) : listMode === 'rename' ? askRename(s) : openSong(s));
     list.appendChild(card);
   }
 }
+
+// ================= 목록 편집 모드 (삭제 / 이름 바꾸기) =================
+function setListMode(m) {
+  listMode = m;
+  $('home').classList.toggle('del-mode', m === 'del');
+  $('home').classList.toggle('rename-mode', m === 'rename');
+  $('btnDelMode').textContent = m === 'del' ? '✔ 완료' : '🗑 삭제하기';
+  $('btnRenameMode').textContent = m === 'rename' ? '✔ 완료' : '✏️ 이름 바꾸기';
+  $('btnDelMode').hidden = m === 'rename';
+  $('btnRenameMode').hidden = m === 'del';
+  $('btnRestore').hidden = !(m === 'del' && hiddenSongs().length);
+  if (m) toast(m === 'del' ? '지울 곡을 누르세요' : '이름을 바꿀 곡을 누르세요');
+}
+
+// ================= 곡 이름 바꾸기 =================
+function askRename(s) {
+  renameTarget = s;
+  $('renameInput').value = s.title;
+  $('btnRenameReset').hidden = !s.origTitle;
+  $('renameModal').classList.add('show');
+  $('renameInput').focus();
+  $('renameInput').select();
+}
+async function saveRename(title) {
+  const s = renameTarget;
+  $('renameModal').classList.remove('show');
+  if (!s) return;
+  if (s.src === 'user') {
+    const list = userScores();
+    const u = list.find((x) => x.id === s.id);
+    if (u) u.title = title;
+    localStorage.setItem(USER_KEY, JSON.stringify(list));
+  } else {
+    const map = renamedSongs();
+    if (title === (s.origTitle || s.title) || !title) delete map[s.id]; else map[s.id] = title;
+    localStorage.setItem(RENAME_KEY, JSON.stringify(map));
+  }
+  await loadSongs();
+  toast(`"${title}"(으)로 바꿨어요`);
+}
+$('btnRenameMode').onclick = () => setListMode(listMode === 'rename' ? '' : 'rename');
+$('btnRenameCancel').onclick = () => $('renameModal').classList.remove('show');
+$('btnRenameOk').onclick = () => {
+  const t = $('renameInput').value.trim();
+  if (!t) { toast('이름을 입력해 주세요'); return; }
+  saveRename(t);
+};
+$('btnRenameReset').onclick = () => saveRename(renameTarget.origTitle);
+$('renameInput').onkeydown = (e) => { if (e.key === 'Enter') $('btnRenameOk').click(); };
+
+// ================= 곡 삭제 =================
+function askDelete(s) {
+  delTarget = s;
+  $('delMsg').innerHTML = `<b>"${esc(s.title)}"</b> 곡을 목록에서 지울까요?<br><span class="hint">` +
+    (s.src === 'user' ? '내가 추가한 악보라 되돌릴 수 없어요.' : "기본 곡은 '↩ 기본 곡 되돌리기'로 다시 꺼낼 수 있어요.") + '</span>';
+  $('delModal').classList.add('show');
+}
+$('btnDelMode').onclick = () => setListMode(listMode === 'del' ? '' : 'del');
+$('btnDelCancel').onclick = () => $('delModal').classList.remove('show');
+$('btnDelOk').onclick = async () => {
+  const s = delTarget;
+  $('delModal').classList.remove('show');
+  if (!s) return;
+  if (s.src === 'user') localStorage.setItem(USER_KEY, JSON.stringify(userScores().filter((u) => u.id !== s.id)));
+  else localStorage.setItem(HIDDEN_KEY, JSON.stringify([...new Set([...hiddenSongs(), s.id])]));
+  await loadSongs();
+  toast(`"${s.title}" 삭제됨`);
+};
+$('btnRestore').onclick = async () => {
+  localStorage.removeItem(HIDDEN_KEY);
+  await loadSongs();
+  toast('기본 곡을 모두 되돌렸어요');
+};
 function sparkline(h) {
   if (!h || h.length < 2) return '';
   const pts = h.slice(-10), w = 60, ht = 18;

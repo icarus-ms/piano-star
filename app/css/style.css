@@ -43,7 +43,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .lv-쉬움 { background: rgba(61,220,151,.25); } .lv-보통 { background: rgba(47,123,255,.3); } .lv-원곡, .lv-어려움 { background: rgba(255,77,94,.3); }
 .best { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .best .g { font-weight: 900; font-size: 22px; }
-.song-card .del { align-self: flex-end; font-size: 12px; color: var(--mute); background: none; border: 0; }
+.song-card { position: relative; }
+.del-mode .song-card { border-color: rgba(255,77,94,.5); animation: wiggle .4s ease-in-out infinite alternate; }
+.del-mode .song-card::after { content: "✕"; position: absolute; top: -8px; right: -8px; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--red); color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+@keyframes wiggle { from { transform: rotate(-.4deg); } to { transform: rotate(.4deg); } }
+.del-mode .add-btn, .rename-mode .add-btn { display: none; }
+.rename-mode .song-card { border-color: rgba(255,122,198,.6); }
+.rename-mode .song-card::after { content: "✏️"; position: absolute; top: -8px; right: -8px; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+#renameInput { width: 100%; padding: 12px 14px; border-radius: 12px; background: #11142a; color: var(--ink);
+  border: 1px solid rgba(255,255,255,.15); font: inherit; font-size: 18px; }
+.btn.danger-fill { background: var(--red); }
 
 /* ---------- play ---------- */
 .play-head { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--bg2); flex-wrap: wrap; }
